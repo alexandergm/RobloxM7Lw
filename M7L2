@@ -1,0 +1,135 @@
+local serverstorage = game:GetService("ServerStorage")
+
+local maps = serverstorage:WaitForChild("Maps")
+local mapholder = game.Workspace:WaitForChild("MapHolder")
+
+local roundTimer = 60 * 5
+local replicatedstorage = game:GetService("ReplicatedStorage")
+local statustag = replicatedstorage:WaitForChild("StatusTag")
+local timertag = replicatedstorage:WaitForChild("TimerTag")
+local event = replicatedstorage:WaitForChild("RemoteEvent")
+local lobbyTimer = 20
+
+while true do
+	statustag.Value = "Loading Map"
+	timertag.Value = -1
+	mapholder:ClearAllChildren()
+	wait(2)
+	local allmaps = maps:GetChildren()
+	local newmap = allmaps[math.random(1, #allmaps)]:clone()
+	newmap.Parent = game.Workspace.MapHolder
+	wait(2)
+	while true do	
+		wait(5)		
+		statustag.Value = "Waiting for Players"
+		timertag.Value = -1		
+		count = {}
+		for i, player in pairs(game.Players:GetPlayers()) do			
+			table.insert(count, player)
+		end
+		if #count >=3 then
+			break			
+		end
+	end
+	
+	statustag.Value = "Match"
+	timertag.Value = roundTimer
+	
+	murder = count[math.random(1, #count)]
+	while true do
+		randomplayer = count[math.random(1, #count)]
+		if randomplayer ~= murder then
+			sheriff = randomplayer
+			break
+		end
+	end
+	
+	local spawnsmodel = newmap:WaitForChild("Spawns")
+	local spawns = spawnsmodel:GetChildren()
+	for i, player in pairs(count) do
+		if player and player.Character and #spawns > 0 then
+			local RootPart = player.Character:WaitForChild("HumanoidRootPart")
+			local spawnindex = math.random(1, #spawns)
+			local spawn = spawns[spawnindex]
+			if spawn and RootPart then
+				table.remove(spawns, spawnindex)
+				RootPart.CFrame = CFrame.new(spawn.Position + Vector3.new(0, 3, 0))		
+				local matchtag = Instance.new("StringValue")
+				matchtag.Name = "Match"
+				matchtag.Parent = player.Character		
+				local backpack = player:FindFirstChild("Backpack")				
+				if backpack then
+					if player == murder then
+						local sword = serverstorage:WaitForChild("KodlandSword"):clone()
+						sword.Parent = backpack
+					elseif player == sheriff then
+						local netgun = serverstorage:WaitForChild("NetKodland"):clone()
+						netgun.Parent = backpack
+					end
+				end
+			end
+		end
+	end
+	spawnsmodel:remove()	
+	
+	local localtimer = roundTimer
+	while localtimer > 0 do
+		wait(1)
+		localtimer = localtimer - 1
+		timertag.Value = localtimer		
+		--Logging the active players in the table
+		activeplayers = {}
+		--Create a variable that will determine if the hunter is still in the game
+		murderactive = false		
+		for i, player in pairs(count) do			
+			local character = player.Character		
+			local matchtag = character:FindFirstChild("Match")
+			local humanoid = character:FindFirstChild("Humanoid")
+			if matchtag and humanoid.Health > 0 then
+				--If there is a hunter left among the players, we specify this with a boolean variable
+				if player == murder then
+					murderactive = true
+				end
+				--Add to the array of active players
+				table.insert(activeplayers, player)						
+			end	
+		end		
+		--If there are 1 or fewer players or no hunter, then stop the cycle responsible for the match
+		if #activeplayers <= 1 or not murderactive then
+			break
+		end	
+	end
+	--Create an array of spawns in the lobby and fill it
+	local lobbyspawns = {}
+	for i, teleports in pairs(game.Workspace:WaitForChild("Lobby"):GetChildren()) do
+		if teleports.Name == "SpawnLocation" then
+			table.insert(lobbyspawns, teleports)
+		end
+	end	
+	--Disable all weapons
+	for i, player in pairs(activeplayers) do			
+		local humanoid = player.Character:FindFirstChild("Humanoid")
+		if humanoid then
+			humanoid:UnequipTools()
+		end			
+		--Create a variable that contains a random spun array
+		local randomspawn = lobbyspawns[math.random(1, #lobbyspawns)]
+		--teleporting players into the lobby to a random spawn
+		player.Character:MoveTo(randomspawn.Position)
+		--Removing weapons from the backpack
+		local backpack = player:FindFirstChild("Backpack")
+		if backpack then
+			backpack:ClearAllChildren()
+		end	
+		
+	end	
+	--Turn on the lobby timer
+	statustag.Value = "Intermission"
+	timertag.Value = lobbyTimer
+	local localtimer = lobbyTimer
+	while localtimer > 0 do
+		wait(1)
+		localtimer = localtimer - 1
+		timertag.Value = localtimer
+	end	
+end
